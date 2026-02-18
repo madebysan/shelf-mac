@@ -22,26 +22,26 @@ struct ShelfApp: App {
                 .environmentObject(miniPlayerController)
                 .frame(minWidth: 800, minHeight: 600)
                 .onAppear {
-                    // On first launch, prompt to pick a folder
-                    if libraryVM.libraryFolderPath == nil {
-                        libraryVM.pickFolder()
+                    // On first launch (no libraries), prompt to add one
+                    if libraryVM.libraries.isEmpty {
+                        libraryVM.addLibrary()
                     } else {
-                        // Scan existing library
+                        // Scan the active library
                         Task { await libraryVM.scanLibrary() }
                     }
                 }
         }
         .commands {
-            // File menu: Refresh Library
+            // File menu
             CommandGroup(after: .newItem) {
                 Button("Refresh Library") {
                     Task { await libraryVM.scanLibrary() }
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(libraryVM.isScanning)
+                .disabled(libraryVM.isScanning || libraryVM.activeLibrary == nil)
 
-                Button("Choose Audiobooks Folder...") {
-                    libraryVM.pickFolder()
+                Button("Add Library...") {
+                    libraryVM.addLibrary()
                 }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
 

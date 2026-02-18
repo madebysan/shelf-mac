@@ -207,12 +207,12 @@ struct LibraryGridView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.secondary)
 
-            if libraryVM.libraryFolderPath == nil {
-                Text("No audiobooks folder selected")
+            if libraryVM.activeLibrary == nil {
+                Text("No library selected")
                     .font(.title3)
                     .foregroundColor(.secondary)
-                Button("Choose Folder") {
-                    libraryVM.pickFolder()
+                Button("Add Library") {
+                    libraryVM.addLibrary()
                 }
             } else if !libraryVM.searchText.isEmpty {
                 Text("No books match your search")

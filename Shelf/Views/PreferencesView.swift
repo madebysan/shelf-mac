@@ -4,21 +4,30 @@ import SwiftUI
 struct PreferencesView: View {
     @EnvironmentObject var libraryVM: LibraryViewModel
 
+    @State private var showManageLibraries = false
+
     var body: some View {
         Form {
             Section("Library") {
                 HStack {
                     VStack(alignment: .leading) {
-                        Text("Audiobooks Folder")
-                            .font(.headline)
-                        if let path = libraryVM.libraryFolderPath {
-                            Text(path)
+                        if let library = libraryVM.activeLibrary {
+                            Text(library.displayName)
+                                .font(.headline)
+                            if let path = library.folderPath {
+                                Text(path)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            Text("\(libraryVM.books.count) book\(libraryVM.books.count == 1 ? "" : "s")")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                                .foregroundStyle(.tertiary)
                         } else {
-                            Text("No folder selected")
+                            Text("No Library Selected")
+                                .font(.headline)
+                            Text("Add a library to get started.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -26,15 +35,15 @@ struct PreferencesView: View {
 
                     Spacer()
 
-                    Button("Change...") {
-                        libraryVM.pickFolder()
+                    Button("Manage Libraries...") {
+                        showManageLibraries = true
                     }
                 }
 
                 Button("Refresh Library Now") {
                     Task { await libraryVM.scanLibrary() }
                 }
-                .disabled(libraryVM.isScanning || libraryVM.libraryFolderPath == nil)
+                .disabled(libraryVM.isScanning || libraryVM.activeLibrary == nil)
 
                 if libraryVM.isScanning {
                     ProgressView()
@@ -88,6 +97,10 @@ struct PreferencesView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 380)
+        .frame(width: 450, height: 400)
+        .sheet(isPresented: $showManageLibraries) {
+            ManageLibrariesView()
+                .environmentObject(libraryVM)
+        }
     }
 }

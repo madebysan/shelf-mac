@@ -3,7 +3,8 @@ import CoreData
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Controls library state: scanning, filtering, sorting, and grouping
+/// Controls library state: scanning, filtering, sorting, and grouping.
+/// Supports multiple libraries — each pointing to a different audiobooks folder.
 @MainActor
 class LibraryViewModel: ObservableObject {
 
@@ -15,13 +16,25 @@ class LibraryViewModel: ObservableObject {
     @Published var selectedCategory: SidebarCategory = .allBooks
     @Published var isScanning: Bool = false
     @Published var scanResult: ScanResult?
-    @Published var libraryFolderPath: String?
 
-    // MARK: - Grouping Data
+    /// All libraries the user has added
+    @Published var libraries: [Library] = []
+    /// The currently selected library (determines which books are shown)
+    @Published var activeLibrary: Library?
+
+    // MARK: - Grouping Data & Pre-computed Counts
 
     @Published var authors: [String] = []
     @Published var genres: [String] = []
     @Published var years: [Int32] = []
+
+    /// Pre-computed sidebar counts — avoids re-filtering 1,800+ books on every render
+    @Published var inProgressCount: Int = 0
+    @Published var completedCount: Int = 0
+    @Published var authorCounts: [String: Int] = [:]
+    @Published var genreCounts: [String: Int] = [:]
+    @Published var yearCounts: [Int32: Int] = [:]
+    @Published var smartCollectionCounts: [SmartCollection: Int] = [:]
 
     // MARK: - View Mode
 
@@ -110,21 +123,230 @@ class LibraryViewModel: ObservableObject {
 
     init(persistence: PersistenceController = .shared) {
         self.persistence = persistence
-        self.libraryFolderPath = UserDefaults.standard.string(forKey: "libraryFolderPath")
+
+        // Migrate from single-library UserDefaults if needed
+        migrateFromSingleLibrary()
+
+        // Load all libraries and restore the last-used one
+        loadLibraries()
+        restoreLastLibrary()
+
+        // Load books for the active library and start folder access
         loadBooks()
-        // Start security-scoped access on launch so files are readable for playback
         startFolderAccess()
+    }
+
+    // MARK: - Migration
+
+    /// One-time migration: converts the old single-folder UserDefaults storage
+    /// into a Library entity so existing users keep their books.
+    private func migrateFromSingleLibrary() {
+        let context = persistence.container.viewContext
+
+        // Check if any Library entities already exist
+        let request: NSFetchRequest<Library> = Library.fetchRequest()
+        let count = (try? context.count(for: request)) ?? 0
+        if count > 0 { return } // Already migrated or fresh multi-library user
+
+        // Check if there's an old single-library path in UserDefaults
+        guard let oldPath = UserDefaults.standard.string(forKey: "libraryFolderPath") else { return }
+
+        // Create a Library entity from the old data
+        let library = Library(context: context)
+        library.id = UUID()
+        library.folderPath = oldPath
+        library.name = URL(fileURLWithPath: oldPath).lastPathComponent
+        library.createdDate = Date()
+        library.lastOpenedDate = Date()
+
+        // Copy the security-scoped bookmark if available
+        if let bookmarkData = UserDefaults.standard.data(forKey: "libraryFolderBookmark") {
+            library.folderBookmark = bookmarkData
+        }
+
+        // Associate ALL existing Book entities with this library
+        let bookRequest: NSFetchRequest<Book> = Book.fetchRequest()
+        if let existingBooks = try? context.fetch(bookRequest) {
+            for book in existingBooks {
+                book.library = library
+            }
+        }
+
+        persistence.save()
+        print("Migrated single library: \(oldPath)")
+    }
+
+    // MARK: - Library Management
+
+    /// Loads all Library entities from Core Data, sorted by name
+    func loadLibraries() {
+        let request: NSFetchRequest<Library> = Library.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Library.name, ascending: true)]
+        do {
+            libraries = try persistence.container.viewContext.fetch(request)
+        } catch {
+            print("Failed to fetch libraries: \(error)")
+        }
+    }
+
+    /// Restores the library with the most recent lastOpenedDate
+    private func restoreLastLibrary() {
+        guard !libraries.isEmpty else { return }
+        activeLibrary = libraries
+            .sorted { ($0.lastOpenedDate ?? .distantPast) > ($1.lastOpenedDate ?? .distantPast) }
+            .first
+    }
+
+    /// Switches to a different library: stops folder access, sets active,
+    /// updates lastOpenedDate, and reloads books.
+    func switchToLibrary(_ library: Library) {
+        stopFolderAccess()
+        activeLibrary = library
+        library.lastOpenedDate = Date()
+        persistence.save()
+        selectedCategory = .allBooks
+        loadBooks()
+        startFolderAccess()
+    }
+
+    /// Opens an NSOpenPanel to pick a new audiobooks folder, creates a Library entity,
+    /// switches to it, and scans.
+    func addLibrary() {
+        let panel = NSOpenPanel()
+        panel.title = "Select an Audiobooks Folder"
+        panel.message = "Choose a folder containing your audiobook files (m4b, m4a, mp3)."
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let newPath = url.path
+
+        // Reject duplicates — don't add the same folder twice
+        if libraries.contains(where: { $0.folderPath == newPath }) {
+            let alert = NSAlert()
+            alert.messageText = "Library Already Exists"
+            alert.informativeText = "This folder is already added as a library."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        let context = persistence.container.viewContext
+        let library = Library(context: context)
+        library.id = UUID()
+        library.folderPath = newPath
+        library.name = url.lastPathComponent
+        library.createdDate = Date()
+        library.lastOpenedDate = Date()
+
+        // Save a security-scoped bookmark
+        do {
+            let bookmarkData = try url.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            library.folderBookmark = bookmarkData
+        } catch {
+            print("Failed to save bookmark: \(error)")
+        }
+
+        persistence.save()
+        loadLibraries()
+        switchToLibrary(library)
+
+        // Scan the new library
+        Task { await scanLibrary() }
+    }
+
+    /// Removes a library (deletes entity — cascade removes book metadata, NOT files on disk).
+    /// Switches to the next available library, or sets active to nil.
+    func removeLibrary(_ library: Library) {
+        let context = persistence.container.viewContext
+        let wasActive = (library == activeLibrary)
+
+        context.delete(library)
+        persistence.save()
+        loadLibraries()
+
+        if wasActive {
+            if let next = libraries.first {
+                switchToLibrary(next)
+            } else {
+                stopFolderAccess()
+                activeLibrary = nil
+                books = []
+                authors = []
+                genres = []
+                years = []
+            }
+        }
+    }
+
+    /// Opens an NSOpenPanel to pick a new folder for an existing library (e.g., folder was moved).
+    /// Updates the path and bookmark, and rescans if it's the active library.
+    func relinkLibrary(_ library: Library) {
+        let panel = NSOpenPanel()
+        panel.title = "Relink \"\(library.displayName)\""
+        panel.message = "Choose the new location for this audiobooks folder."
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        library.folderPath = url.path
+
+        // Update the security-scoped bookmark
+        do {
+            let bookmarkData = try url.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            library.folderBookmark = bookmarkData
+        } catch {
+            print("Failed to save bookmark: \(error)")
+        }
+
+        persistence.save()
+        loadLibraries()
+
+        // If this is the active library, restart access and rescan
+        if library == activeLibrary {
+            startFolderAccess()
+            Task { await scanLibrary() }
+        }
+    }
+
+    /// Renames a library
+    func renameLibrary(_ library: Library, to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        library.name = trimmed
+        persistence.save()
+        loadLibraries()
+    }
+
+    /// The folder path of the active library (used by UI)
+    var libraryFolderPath: String? {
+        activeLibrary?.folderPath
     }
 
     // MARK: - Security-Scoped Folder Access
 
-    /// Starts security-scoped access to the bookmarked folder.
+    /// Starts security-scoped access to the active library's bookmarked folder.
     /// Keeps it alive so AVPlayer can read audio files at any time.
     func startFolderAccess() {
         // Stop any previous access
         stopFolderAccess()
 
-        guard let bookmarkData = UserDefaults.standard.data(forKey: "libraryFolderBookmark") else { return }
+        guard let bookmarkData = activeLibrary?.folderBookmark else { return }
 
         var isStale = false
         do {
@@ -141,7 +363,8 @@ class LibraryViewModel: ObservableObject {
                     includingResourceValuesForKeys: nil,
                     relativeTo: nil
                 )
-                UserDefaults.standard.set(newBookmark, forKey: "libraryFolderBookmark")
+                activeLibrary?.folderBookmark = newBookmark
+                persistence.save()
             }
 
             if url.startAccessingSecurityScopedResource() {
@@ -152,7 +375,7 @@ class LibraryViewModel: ObservableObject {
         }
     }
 
-    /// Stops security-scoped access (called on folder change or app quit)
+    /// Stops security-scoped access (called on library switch or app quit)
     func stopFolderAccess() {
         activeFolderURL?.stopAccessingSecurityScopedResource()
         activeFolderURL = nil
@@ -160,42 +383,10 @@ class LibraryViewModel: ObservableObject {
 
     // MARK: - Library Scanning
 
-    /// Prompts the user to pick a folder (called on first launch or when changing the folder)
-    func pickFolder() {
-        let panel = NSOpenPanel()
-        panel.title = "Select Your Audiobooks Folder"
-        panel.message = "Choose the folder containing your audiobook files (m4b, m4a, mp3)."
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = false
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        // Save a security-scoped bookmark so we can access this folder across launches
-        do {
-            let bookmarkData = try url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            UserDefaults.standard.set(bookmarkData, forKey: "libraryFolderBookmark")
-        } catch {
-            print("Failed to save bookmark: \(error)")
-        }
-
-        libraryFolderPath = url.path
-        UserDefaults.standard.set(url.path, forKey: "libraryFolderPath")
-
-        // Restart security-scoped access with the new bookmark
-        startFolderAccess()
-
-        // Scan immediately
-        Task { await scanLibrary() }
-    }
-
-    /// Scans the library folder and updates Core Data
+    /// Scans the active library's folder and updates Core Data
     func scanLibrary() async {
+        guard let library = activeLibrary else { return }
+
         // Ensure folder access is active
         if activeFolderURL == nil {
             startFolderAccess()
@@ -206,7 +397,7 @@ class LibraryViewModel: ObservableObject {
         isScanning = true
         let context = persistence.container.viewContext
 
-        let result = await LibraryScanner.scan(folder: folderURL, context: context)
+        let result = await LibraryScanner.scan(folder: folderURL, library: library, context: context)
         self.scanResult = result
 
         // Don't stop security-scoped access — AVPlayer needs it to read files
@@ -214,32 +405,82 @@ class LibraryViewModel: ObservableObject {
         loadBooks()
         isScanning = false
 
-        print("Library scan: \(result.summary)")
+        print("Library scan (\(library.displayName)): \(result.summary)")
     }
 
     /// Fallback: returns a plain file URL (works outside sandbox)
     private func fallbackFolderURL() -> URL? {
-        guard let path = libraryFolderPath else { return nil }
+        guard let path = activeLibrary?.folderPath else { return nil }
         return URL(fileURLWithPath: path)
     }
 
     // MARK: - Data Loading
 
-    /// Loads books from Core Data and updates grouping data
+    /// Loads books for the active library from Core Data and updates grouping data + counts
     func loadBooks() {
+        guard let library = activeLibrary else {
+            books = []
+            authors = []
+            genres = []
+            years = []
+            inProgressCount = 0
+            completedCount = 0
+            authorCounts = [:]
+            genreCounts = [:]
+            yearCounts = [:]
+            smartCollectionCounts = [:]
+            return
+        }
+
         let request: NSFetchRequest<Book> = Book.fetchRequest()
+        request.predicate = NSPredicate(format: "library == %@", library)
+        // Batch fetching — Core Data loads objects in chunks instead of all at once
+        request.fetchBatchSize = 50
         do {
             let allBooks = try persistence.container.viewContext.fetch(request)
 
-            // Extract unique authors and genres for sidebar
-            let authorSet = Set(allBooks.compactMap { $0.author }.filter { !$0.isEmpty })
-            authors = authorSet.sorted()
+            // Build all grouping data and counts in a single pass
+            var authorCountMap: [String: Int] = [:]
+            var genreCountMap: [String: Int] = [:]
+            var yearCountMap: [Int32: Int] = [:]
+            var smartCounts: [SmartCollection: Int] = [:]
+            var ipCount = 0
+            var cCount = 0
 
-            let genreSet = Set(allBooks.compactMap { $0.genre }.filter { !$0.isEmpty })
-            genres = genreSet.sorted()
+            for book in allBooks {
+                // Category counts
+                if book.isInProgress { ipCount += 1 }
+                if book.isCompleted { cCount += 1 }
 
-            let yearSet = Set(allBooks.map { $0.year }.filter { $0 > 0 })
-            years = yearSet.sorted(by: >)  // newest first
+                // Grouping counts
+                if let a = book.author, !a.isEmpty {
+                    authorCountMap[a, default: 0] += 1
+                }
+                if let g = book.genre, !g.isEmpty {
+                    genreCountMap[g, default: 0] += 1
+                }
+                if book.year > 0 {
+                    yearCountMap[book.year, default: 0] += 1
+                }
+
+                // Smart collection counts
+                for collection in SmartCollection.allCases {
+                    if collection.matches(book) {
+                        smartCounts[collection, default: 0] += 1
+                    }
+                }
+            }
+
+            authors = authorCountMap.keys.sorted()
+            genres = genreCountMap.keys.sorted()
+            years = yearCountMap.keys.sorted(by: >)
+
+            authorCounts = authorCountMap
+            genreCounts = genreCountMap
+            yearCounts = yearCountMap
+            smartCollectionCounts = smartCounts
+            inProgressCount = ipCount
+            completedCount = cCount
 
             books = allBooks
         } catch {

@@ -7,20 +7,20 @@ class LibraryScanner {
     // Audio file extensions we support
     private static let supportedExtensions: Set<String> = ["m4b", "m4a", "mp3"]
 
-    /// Scans the given folder recursively for audiobook files.
-    /// - Adds new files to Core Data
+    /// Scans the given folder recursively for audiobook files, scoped to a specific library.
+    /// - Adds new files to Core Data (associated with the library)
     /// - Removes entries for deleted files
     /// - Re-extracts metadata for files whose modification date changed
     /// - Skips unchanged files entirely
-    static func scan(folder: URL, context: NSManagedObjectContext) async -> ScanResult {
+    static func scan(folder: URL, library: Library, context: NSManagedObjectContext) async -> ScanResult {
         var result = ScanResult()
 
         // Find all audio files in the folder
         let audioFiles = findAudioFiles(in: folder)
         result.totalFilesFound = audioFiles.count
 
-        // Fetch all existing books from Core Data
-        let existingBooks = fetchAllBooks(context: context)
+        // Fetch existing books for THIS library only
+        let existingBooks = fetchBooks(for: library, context: context)
         var existingByPath: [String: Book] = [:]
         for book in existingBooks {
             if let path = book.filePath {
@@ -64,6 +64,7 @@ class LibraryScanner {
                 let book = Book(context: context)
                 book.id = UUID()
                 book.filePath = path
+                book.library = library
                 updateBook(book, with: metadata, filePath: path, modDate: fileModificationDate(for: fileURL))
                 result.added += 1
             }
@@ -105,9 +106,10 @@ class LibraryScanner {
         return audioFiles
     }
 
-    /// Fetches all Book entities from Core Data
-    private static func fetchAllBooks(context: NSManagedObjectContext) -> [Book] {
+    /// Fetches Book entities for a specific library
+    private static func fetchBooks(for library: Library, context: NSManagedObjectContext) -> [Book] {
         let request: NSFetchRequest<Book> = Book.fetchRequest()
+        request.predicate = NSPredicate(format: "library == %@", library)
         do {
             return try context.fetch(request)
         } catch {

@@ -32,6 +32,8 @@
 		A10000010000000000000104 /* ProgressExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000104 /* ProgressExporter.swift */; };
 		A10000010000000000000105 /* MiniPlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000105 /* MiniPlayerController.swift */; };
 		A10000010000000000000106 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000106 /* MiniPlayerView.swift */; };
+		A10000010000000000000107 /* ManageLibrariesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000107 /* ManageLibrariesView.swift */; };
+		A10000010000000000000108 /* Library+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000108 /* Library+Extensions.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -63,6 +65,8 @@
 		A20000010000000000000104 /* ProgressExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressExporter.swift; sourceTree = "<group>"; };
 		A20000010000000000000105 /* MiniPlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerController.swift; sourceTree = "<group>"; };
 		A20000010000000000000106 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
+		A20000010000000000000107 /* ManageLibrariesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManageLibrariesView.swift; sourceTree = "<group>"; };
+		A20000010000000000000108 /* Library+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Library+Extensions.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -106,6 +110,7 @@
 				A20000010000000000000004 /* AudiobookModel.xcdatamodeld */,
 				A20000010000000000000018 /* Book+Extensions.swift */,
 				A20000010000000000000101 /* Bookmark+Extensions.swift */,
+				A20000010000000000000108 /* Library+Extensions.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -124,6 +129,7 @@
 				A20000010000000000000102 /* BookmarkListView.swift */,
 				A20000010000000000000103 /* AddBookmarkSheet.swift */,
 				A20000010000000000000106 /* MiniPlayerView.swift */,
+				A20000010000000000000107 /* ManageLibrariesView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -251,6 +257,8 @@
 				A10000010000000000000104 /* ProgressExporter.swift in Sources */,
 				A10000010000000000000105 /* MiniPlayerController.swift in Sources */,
 				A10000010000000000000106 /* MiniPlayerView.swift in Sources */,
+				A10000010000000000000107 /* ManageLibrariesView.swift in Sources */,
+				A10000010000000000000108 /* Library+Extensions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

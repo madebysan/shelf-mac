@@ -15,8 +15,8 @@ extension Book {
         return Self.placeholderCover
     }
 
-    /// A simple programmatic placeholder for books without cover art (1:1)
-    static var placeholderCover: NSImage {
+    /// Cached placeholder image — drawn once, reused for all books without cover art
+    private static let _cachedPlaceholder: NSImage = {
         let size = NSSize(width: 200, height: 200)
         let image = NSImage(size: size)
         image.lockFocus()
@@ -38,7 +38,10 @@ extension Book {
 
         image.unlockFocus()
         return image
-    }
+    }()
+
+    /// A simple programmatic placeholder for books without cover art (1:1)
+    static var placeholderCover: NSImage { _cachedPlaceholder }
 
     // MARK: - Computed Properties
 

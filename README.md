@@ -15,6 +15,7 @@ Browse, listen, bookmark, and pick up where you left off.</p>
 
 ## Features
 
+- **Multiple libraries** — add as many audiobook folders as you want, each with independent books and playback state. Switch between them from the sidebar dropdown or manage them all from a single sheet.
 - **Library management** — point Shelf at a folder of audiobooks and it scans for m4b, m4a, and mp3 files, extracting metadata and cover art automatically
 - **Multiple view modes** — browse your library as a grid, large grid, or sortable list
 - **Playback** — play/pause, skip forward/back 30s, adjustable speed (0.5x-2x), chapter navigation, and media key support
@@ -51,7 +52,7 @@ Build and run with Cmd+R in Xcode.
 | Cmd + B | Add bookmark |
 | Cmd + Shift + M | Toggle mini player |
 | Cmd + R | Refresh library |
-| Cmd + Shift + O | Choose audiobooks folder |
+| Cmd + Shift + O | Add library |
 | Cmd + Shift + E | Export progress |
 | Cmd + Shift + I | Import progress |
 
@@ -62,9 +63,10 @@ Shelf/
   ShelfApp.swift            # App entry point, menu commands
   ContentView.swift         # Main window layout
   Models/
-    AudiobookModel          # Core Data model (Book + Bookmark entities)
+    AudiobookModel          # Core Data model (Book, Bookmark, Library entities)
     Book+Extensions.swift   # Display helpers, formatting
     Bookmark+Extensions.swift
+    Library+Extensions.swift # Library display helpers
   ViewModels/
     LibraryViewModel.swift  # Library state, scanning, filtering, import/export
     PlayerViewModel.swift   # Playback bridge, chapters, bookmarks
@@ -75,10 +77,11 @@ Shelf/
     PlayerView.swift        # Full player sheet
     NowPlayingBar.swift     # Bottom bar mini player
     MiniPlayerView.swift    # Floating panel player
-    SidebarView.swift       # Navigation sidebar
+    SidebarView.swift       # Navigation sidebar with library switcher
     ChapterListView.swift   # Chapter navigator
     BookmarkListView.swift  # Bookmark list with jump-to
     AddBookmarkSheet.swift  # New bookmark modal
+    ManageLibrariesView.swift # Library management sheet
     PreferencesView.swift   # Settings window
   Services/
     AudioPlayerService.swift    # AVPlayer wrapper, Now Playing integration

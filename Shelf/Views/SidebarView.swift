@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Sidebar navigation with collapsible groups — inspired by Things app
+/// Sidebar navigation with collapsible groups — inspired by Things app.
+/// Includes a library dropdown at the top for switching between multiple libraries.
 struct SidebarView: View {
     @EnvironmentObject var libraryVM: LibraryViewModel
 
@@ -10,33 +11,32 @@ struct SidebarView: View {
     @AppStorage("sidebar_genresExpanded") private var genresExpanded = false
     @AppStorage("sidebar_yearsExpanded") private var yearsExpanded = false
 
-    // Book counts for library categories
-    private var inProgressCount: Int {
-        libraryVM.books.filter { $0.isInProgress }.count
-    }
-    private var completedCount: Int {
-        libraryVM.books.filter { $0.isCompleted }.count
-    }
+    @State private var showManageLibraries = false
 
-    /// Smart collections that have at least one matching book
+    /// Smart collections that have at least one matching book (uses pre-computed counts)
     private var activeSmartCollections: [(collection: LibraryViewModel.SmartCollection, count: Int)] {
         LibraryViewModel.SmartCollection.allCases.compactMap { collection in
-            let count = libraryVM.books.filter { collection.matches($0) }.count
+            let count = libraryVM.smartCollectionCounts[collection] ?? 0
             return count > 0 ? (collection, count) : nil
         }
     }
 
     var body: some View {
         List(selection: $libraryVM.selectedCategory) {
+            // Library dropdown — Eagle-style switcher at the top
+            Section {
+                libraryDropdown
+            }
+
             // Library — always visible
             Section {
                 sidebarRow("All Books", icon: "books.vertical", count: libraryVM.books.count)
                     .tag(LibraryViewModel.SidebarCategory.allBooks)
 
-                sidebarRow("In Progress", icon: "book", count: inProgressCount)
+                sidebarRow("In Progress", icon: "book", count: libraryVM.inProgressCount)
                     .tag(LibraryViewModel.SidebarCategory.inProgress)
 
-                sidebarRow("Completed", icon: "checkmark.circle", count: completedCount)
+                sidebarRow("Completed", icon: "checkmark.circle", count: libraryVM.completedCount)
                     .tag(LibraryViewModel.SidebarCategory.completed)
             } header: {
                 Text("Library")
@@ -58,7 +58,7 @@ struct SidebarView: View {
             if !libraryVM.authors.isEmpty {
                 DisclosureGroup(isExpanded: $authorsExpanded) {
                     ForEach(libraryVM.authors, id: \.self) { author in
-                        sidebarRow(author, icon: "person", count: countBooks(for: .author(author)))
+                        sidebarRow(author, icon: "person", count: libraryVM.authorCounts[author] ?? 0)
                             .tag(LibraryViewModel.SidebarCategory.author(author))
                     }
                 } label: {
@@ -71,7 +71,7 @@ struct SidebarView: View {
             if !libraryVM.genres.isEmpty {
                 DisclosureGroup(isExpanded: $genresExpanded) {
                     ForEach(libraryVM.genres, id: \.self) { genre in
-                        sidebarRow(genre, icon: "tag", count: countBooks(for: .genre(genre)))
+                        sidebarRow(genre, icon: "tag", count: libraryVM.genreCounts[genre] ?? 0)
                             .tag(LibraryViewModel.SidebarCategory.genre(genre))
                     }
                 } label: {
@@ -83,7 +83,7 @@ struct SidebarView: View {
             if !libraryVM.years.isEmpty {
                 DisclosureGroup(isExpanded: $yearsExpanded) {
                     ForEach(libraryVM.years, id: \.self) { year in
-                        sidebarRow(String(year), icon: "calendar", count: countBooks(for: .year(year)))
+                        sidebarRow(String(year), icon: "calendar", count: libraryVM.yearCounts[year] ?? 0)
                             .tag(LibraryViewModel.SidebarCategory.year(year))
                     }
                 } label: {
@@ -100,10 +100,93 @@ struct SidebarView: View {
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .disabled(libraryVM.isScanning)
+                .disabled(libraryVM.isScanning || libraryVM.activeLibrary == nil)
                 .help("Refresh Library")
             }
         }
+        .sheet(isPresented: $showManageLibraries) {
+            ManageLibrariesView()
+                .environmentObject(libraryVM)
+        }
+    }
+
+    // MARK: - Library Dropdown
+
+    /// Eagle-style dropdown showing current library with options to switch/add/manage
+    private var libraryDropdown: some View {
+        Menu {
+            // List each library as a switchable option
+            ForEach(libraryVM.libraries, id: \.objectID) { library in
+                Button {
+                    libraryVM.switchToLibrary(library)
+                } label: {
+                    HStack {
+                        if library == libraryVM.activeLibrary {
+                            Image(systemName: "checkmark")
+                        }
+                        VStack(alignment: .leading) {
+                            Text(library.displayName)
+                            Text(library.truncatedPath)
+                                .font(.caption)
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
+                libraryVM.addLibrary()
+            } label: {
+                Label("Add Library...", systemImage: "plus")
+            }
+
+            Divider()
+
+            Button {
+                showManageLibraries = true
+            } label: {
+                Label("Manage Libraries...", systemImage: "gearshape")
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "books.vertical.fill")
+                    .font(.title3)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(libraryVM.activeLibrary?.displayName ?? "No Library")
+                        .font(.headline)
+                        .lineLimit(1)
+
+                    if let path = libraryVM.activeLibrary?.folderPath {
+                        Text(abbreviatePath(path))
+                            .font(.caption)
+                            .opacity(0.6)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption)
+                    .opacity(0.4)
+            }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .tint(.primary)
+    }
+
+    /// Shortens a path for display (replaces home dir with ~)
+    private func abbreviatePath(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path.hasPrefix(home) {
+            return "~" + path.dropFirst(home.count)
+        }
+        return path
     }
 
     // MARK: - Components
@@ -144,19 +227,4 @@ struct SidebarView: View {
         .contentShape(Rectangle())
     }
 
-    /// Counts books matching a sidebar category
-    private func countBooks(for category: LibraryViewModel.SidebarCategory) -> Int {
-        switch category {
-        case .author(let name):
-            return libraryVM.books.filter { $0.author == name }.count
-        case .genre(let name):
-            return libraryVM.books.filter { $0.genre == name }.count
-        case .year(let yr):
-            return libraryVM.books.filter { $0.year == yr }.count
-        case .smartCollection(let collection):
-            return libraryVM.books.filter { collection.matches($0) }.count
-        default:
-            return 0
-        }
-    }
 }
