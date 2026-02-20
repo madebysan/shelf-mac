@@ -126,6 +126,25 @@ enum MetadataExtractor {
         return metadata
     }
 
+    /// Extracts metadata with a timeout — returns nil if extraction takes too long.
+    /// This prevents slow cloud-mounted files (e.g., Google Drive FUSE) from blocking the queue.
+    static func extractWithTimeout(from url: URL, timeout: TimeInterval = 10) async -> AudiobookMetadata? {
+        return await withTaskGroup(of: AudiobookMetadata?.self) { group in
+            // Race: actual extraction vs. timeout
+            group.addTask {
+                return await Self.extract(from: url)
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(timeout))
+                return nil
+            }
+            // First result wins
+            let result = await group.next()
+            group.cancelAll()
+            return result ?? nil
+        }
+    }
+
     /// Extracts chapter list from an audio file
     static func extractChapters(from url: URL) async -> [ChapterInfo] {
         let asset = AVURLAsset(url: url)

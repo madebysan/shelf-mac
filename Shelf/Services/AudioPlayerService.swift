@@ -13,11 +13,13 @@ class AudioPlayerService: ObservableObject {
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
     @Published var playbackRate: Float = 1.0
+    @Published var playbackError: String?
 
     // MARK: - Private
 
     private var player: AVPlayer?
     private var timeObserver: Any?
+    private var statusObservation: NSKeyValueObservation?
     private var currentBook: Book?
     private var saveTimer: Timer?
 
@@ -39,6 +41,15 @@ class AudioPlayerService: ObservableObject {
         guard let path = book.filePath else { return }
         let url = URL(fileURLWithPath: path)
 
+        // Clear any previous error
+        playbackError = nil
+
+        // Check that the file is reachable (catches Drive not mounted, file moved, etc.)
+        if !FileManager.default.isReadableFile(atPath: path) {
+            playbackError = "Cannot access \"\(url.lastPathComponent)\". The file may be unavailable — check that the folder is accessible and try again."
+            return
+        }
+
         // If switching books, save the current one's position first
         if let current = currentBook, current.objectID != book.objectID {
             savePosition()
@@ -55,6 +66,9 @@ class AudioPlayerService: ObservableObject {
             player?.replaceCurrentItem(with: item)
         }
 
+        // Observe player item status for load errors (e.g., cloud file can't buffer)
+        observePlayerItemStatus(item)
+
         // Observe time updates
         setupTimeObserver()
 
@@ -63,11 +77,15 @@ class AudioPlayerService: ObservableObject {
         let rate = playbackRate
         Task {
             // Wait for the asset's duration to load (also confirms the file is readable)
-            if let loadedDuration = try? await item.asset.load(.duration) {
+            do {
+                let loadedDuration = try await item.asset.load(.duration)
                 let secs = CMTimeGetSeconds(loadedDuration)
                 if secs.isFinite {
                     self.duration = secs
                 }
+            } catch {
+                self.playbackError = "Could not load \"\(url.lastPathComponent)\": \(error.localizedDescription)"
+                return
             }
 
             // Seek to saved position if needed
@@ -174,6 +192,22 @@ class AudioPlayerService: ObservableObject {
         guard let book = currentBook else { return }
         book.playbackPosition = currentTime
         PersistenceController.shared.save()
+    }
+
+    // MARK: - Player Item Status
+
+    /// Observes the player item's status to catch errors during buffering/playback
+    /// (e.g., cloud file connection lost mid-stream)
+    private func observePlayerItemStatus(_ item: AVPlayerItem) {
+        statusObservation?.invalidate()
+        statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
+            Task { @MainActor in
+                if item.status == .failed, let error = item.error {
+                    self?.playbackError = "Playback failed: \(error.localizedDescription)"
+                    self?.isPlaying = false
+                }
+            }
+        }
     }
 
     // MARK: - Time Observation

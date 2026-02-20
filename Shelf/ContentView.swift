@@ -41,6 +41,22 @@ struct ContentView: View {
             // Save position when the app quits
             playerVM.audioService.stop()
         }
+        // Show an alert when playback fails (e.g., cloud file unreachable)
+        .alert("Playback Error", isPresented: playbackErrorBinding) {
+            Button("OK") {
+                playerVM.audioService.playbackError = nil
+            }
+        } message: {
+            Text(playerVM.audioService.playbackError ?? "An unknown error occurred.")
+        }
+    }
+
+    /// Binding that converts the optional error string into a Bool for .alert()
+    private var playbackErrorBinding: Binding<Bool> {
+        Binding(
+            get: { playerVM.audioService.playbackError != nil },
+            set: { if !$0 { playerVM.audioService.playbackError = nil } }
+        )
     }
 
     /// Intercepts spacebar globally within the app window for play/pause.

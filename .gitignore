@@ -1,28 +1,16 @@
 # Xcode
 build/
 DerivedData/
-*.xcuserstate
-*.xcworkspace/xcuserdata/
+*.xcuserdata/
 xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 
 # macOS
 .DS_Store
-.AppleDouble
-.LSOverride
+*.swp
+*~
 
-# Binaries & distribution
+# Distribution artifacts
 *.dmg
-*.app
-*.ipa
-*.zip
-
-# Swift Package Manager
-.build/
-Packages/
-
-# CocoaPods (if ever added)
-Pods/
-
-# Compiled output
-*.o
-*.dSYM/

@@ -17,6 +17,14 @@ class LibraryViewModel: ObservableObject {
     @Published var isScanning: Bool = false
     @Published var scanResult: ScanResult?
 
+    /// Background metadata extraction progress
+    @Published var isLoadingMetadata: Bool = false
+    @Published var metadataProgress: Int = 0
+    @Published var metadataTotal: Int = 0
+
+    /// Tracks the background metadata task so it can be cancelled on re-scan
+    private var metadataTask: Task<Void, Never>?
+
     /// All libraries the user has added
     @Published var libraries: [Library] = []
     /// The currently selected library (determines which books are shown)
@@ -383,9 +391,15 @@ class LibraryViewModel: ObservableObject {
 
     // MARK: - Library Scanning
 
-    /// Scans the active library's folder and updates Core Data
+    /// Scans the active library's folder using two passes:
+    /// Pass 1 (fast): discovers files and creates Book entities — books appear immediately
+    /// Pass 2 (background): extracts metadata progressively with a progress bar
     func scanLibrary() async {
         guard let library = activeLibrary else { return }
+
+        // Cancel any in-progress metadata extraction from a previous scan
+        metadataTask?.cancel()
+        metadataTask = nil
 
         // Ensure folder access is active
         if activeFolderURL == nil {
@@ -394,18 +408,42 @@ class LibraryViewModel: ObservableObject {
 
         guard let folderURL = activeFolderURL ?? fallbackFolderURL() else { return }
 
-        isScanning = true
         let context = persistence.container.viewContext
 
-        let result = await LibraryScanner.scan(folder: folderURL, library: library, context: context)
-        self.scanResult = result
-
-        // Don't stop security-scoped access — AVPlayer needs it to read files
-
-        loadBooks()
+        // --- Pass 1: Fast file discovery (no AVFoundation, no network) ---
+        isScanning = true
+        let filesResult = LibraryScanner.scanFiles(folder: folderURL, library: library, context: context)
+        loadBooks()   // Books appear in the grid right away with filename-based titles
         isScanning = false
 
-        print("Library scan (\(library.displayName)): \(result.summary)")
+        print("Library scan (\(library.displayName)): \(filesResult.summary)")
+
+        // --- Pass 2: Background metadata extraction ---
+        let booksToProcess = filesResult.booksNeedingMetadata
+        guard !booksToProcess.isEmpty else { return }
+
+        isLoadingMetadata = true
+        metadataProgress = 0
+        metadataTotal = booksToProcess.count
+
+        metadataTask = Task {
+            await LibraryScanner.extractMetadataInBackground(
+                books: booksToProcess,
+                context: context,
+                onProgress: { [weak self] completed, total in
+                    self?.metadataProgress = completed
+                    self?.metadataTotal = total
+                    // Reload books periodically so covers and titles update in the grid
+                    self?.loadBooks()
+                }
+            )
+
+            // Final reload and cleanup
+            self.loadBooks()
+            self.isLoadingMetadata = false
+            self.metadataTask = nil
+            print("Metadata extraction complete for \(library.displayName)")
+        }
     }
 
     /// Fallback: returns a plain file URL (works outside sandbox)

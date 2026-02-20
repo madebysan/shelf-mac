@@ -25,10 +25,15 @@ struct LibraryGridView: View {
 
             Divider()
 
+            // Metadata loading progress bar (shown during background extraction)
+            if libraryVM.isLoadingMetadata {
+                metadataProgressBar
+            }
+
             // Content
             if libraryVM.isScanning {
                 Spacer()
-                ProgressView("Scanning library...")
+                ProgressView("Discovering audiobooks...")
                     .padding()
                 Spacer()
             } else if libraryVM.filteredBooks.isEmpty {
@@ -196,6 +201,35 @@ struct LibraryGridView: View {
                 .padding(.vertical, 4)
             }
         }
+    }
+
+    // MARK: - Metadata Progress Bar
+
+    /// Non-intrusive progress bar shown at the top of the grid while metadata loads in the background.
+    /// The grid is fully usable during this time — users can browse, search, and play books.
+    private var metadataProgressBar: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text("Loading book details: \(libraryVM.metadataProgress) of \(libraryVM.metadataTotal)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("\(Int(metadataPercentage))%")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            ProgressView(value: metadataPercentage, total: 100)
+                .progressViewStyle(.linear)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 6)
+        .background(Color.primary.opacity(0.03))
+    }
+
+    /// Percentage of metadata extraction complete
+    private var metadataPercentage: Double {
+        guard libraryVM.metadataTotal > 0 else { return 0 }
+        return Double(libraryVM.metadataProgress) / Double(libraryVM.metadataTotal) * 100
     }
 
     // MARK: - Empty State
