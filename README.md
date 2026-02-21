@@ -8,6 +8,7 @@
 Browse, listen, bookmark, and pick up where you left off.</p>
 
 <p align="center">macOS 14+ · Apple Silicon & Intel</p>
+<p align="center"><a href="https://github.com/madebysan/shelf/releases/latest"><strong>Download Shelf</strong></a></p>
 
 <p align="center">
   <img src="shelf-screenshot.png" width="600" alt="Shelf — audiobook library view">
