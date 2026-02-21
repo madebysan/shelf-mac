@@ -128,10 +128,18 @@ class LibraryScanner {
                     guard let book = try? context.existingObject(with: objectID) as? Book else { continue }
 
                     if let metadata = metadata {
-                        updateBook(book, with: metadata, modDate: modDate)
-                        book.metadataLoaded = true
+                        // Only mark as loaded if we got meaningful data (duration > 0).
+                        // Google Drive's FUSE mount can timeout mid-read, returning an
+                        // empty AudiobookMetadata struct. Without this check, those books
+                        // get permanently marked "done" with no title/author/cover.
+                        if metadata.duration > 0 {
+                            updateBook(book, with: metadata, modDate: modDate)
+                            book.metadataLoaded = true
+                        }
+                        // duration == 0 means AVFoundation couldn't read the file — leave
+                        // metadataLoaded = false so it gets retried on the next scan
                     }
-                    // If metadata is nil (timeout), leave metadataLoaded = false for retry later
+                    // If metadata is nil (extractWithTimeout expired), also left for retry
                 }
             }
 

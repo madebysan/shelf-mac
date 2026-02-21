@@ -65,17 +65,37 @@ struct BookCardView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
 
-                    // Play overlay — always in tree, visibility via opacity
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(.black.opacity(0.3))
+                    // Download progress overlay — shown while this book is downloading
+                    if playerVM.downloadingBookID == book.objectID {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(.black.opacity(0.45))
 
-                        Image(systemName: "play.circle.fill")
-                            .font(.system(size: size.playIconSize))
-                            .foregroundColor(.white)
-                            .shadow(radius: 4)
+                            VStack(spacing: 6) {
+                                ProgressView(value: playerVM.downloadProgress)
+                                    .progressViewStyle(.circular)
+                                    .scaleEffect(size == .large ? 1.5 : 1.2)
+                                    .tint(.white)
+
+                                Text("\(Int(playerVM.downloadProgress * 100))%")
+                                    .font(size == .large ? .caption : .caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    } else {
+                        // Play overlay — always in tree, visibility via opacity
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(.black.opacity(0.3))
+
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: size.playIconSize))
+                                .foregroundColor(.white)
+                                .shadow(radius: 4)
+                        }
+                        .opacity(isHovering ? 1 : 0)
                     }
-                    .opacity(isHovering ? 1 : 0)
 
                     // Progress badge
                     if book.progress > 0 && !book.isCompleted {
@@ -97,6 +117,23 @@ struct BookCardView: View {
                             .shadow(radius: 2)
                             .padding(6)
                     }
+
+                    // Cloud-only badge (top-leading corner)
+                    if book.isCloudOnly {
+                        VStack {
+                            HStack {
+                                Image(systemName: "icloud.and.arrow.down")
+                                    .font(size == .large ? .caption : .caption2)
+                                    .foregroundColor(.white)
+                                    .padding(4)
+                                    .background(.ultraThinMaterial)
+                                    .cornerRadius(4)
+                                    .padding(6)
+                                Spacer()
+                            }
+                            Spacer()
+                        }
+                    }
                 }
                 .frame(width: size.coverSize, height: size.coverSize)
             }
@@ -107,23 +144,22 @@ struct BookCardView: View {
                 }
             }
 
-            // Progress bar (thin line under cover)
-            if book.progress > 0 && !book.isCompleted {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color.secondary.opacity(0.2))
-                            .frame(height: 3)
-                            .cornerRadius(1.5)
+            // Progress bar (thin line under cover) — always reserves space to keep cards aligned
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(height: 3)
+                        .cornerRadius(1.5)
 
-                        Rectangle()
-                            .fill(Color.accentColor)
-                            .frame(width: geo.size.width * book.progress, height: 3)
-                            .cornerRadius(1.5)
-                    }
+                    Rectangle()
+                        .fill(Color.accentColor)
+                        .frame(width: geo.size.width * book.progress, height: 3)
+                        .cornerRadius(1.5)
                 }
-                .frame(height: 3)
             }
+            .frame(height: 3)
+            .opacity(book.progress > 0 && !book.isCompleted ? 1 : 0)
 
             // Title
             Text(book.displayTitle)
@@ -145,7 +181,8 @@ struct BookCardView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .frame(width: size.cardWidth)
+        .frame(width: size.cardWidth, alignment: .topLeading)
+        .frame(maxHeight: .infinity, alignment: .top)
         .contextMenu { bookContextMenu }
     }
 
@@ -157,6 +194,13 @@ struct BookCardView: View {
             onTap()
         } label: {
             Label(book.isInProgress ? "Resume" : "Play", systemImage: "play.fill")
+        }
+
+        Button {
+            libraryVM.toggleStarred(book)
+        } label: {
+            Label(book.isStarred ? "Remove from Starred" : "Add to Starred",
+                  systemImage: book.isStarred ? "star.slash" : "star")
         }
 
         Divider()
@@ -200,18 +244,12 @@ struct BookCardView: View {
         Divider()
 
         Menu("Book Info") {
-            if let author = book.author, !author.isEmpty {
-                Text("Author: \(author)")
-            }
-            if let genre = book.genre, !genre.isEmpty {
-                Text("Genre: \(genre)")
-            }
+            Text("Author: \(book.displayAuthor)")
+            Text("Genre: \(book.displayGenre)")
             if book.year > 0 {
                 Text("Year: \(book.year)")
             }
-            if book.duration > 0 {
-                Text("Duration: \(book.formattedDuration)")
-            }
+            Text("Duration: \(book.duration > 0 ? book.formattedDuration : "Unknown")")
             if book.hasChapters {
                 Text("Has chapters")
             }

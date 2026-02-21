@@ -88,6 +88,7 @@ class LibraryViewModel: ObservableObject {
     // MARK: - Smart Collections
 
     enum SmartCollection: String, CaseIterable, Hashable {
+        case starred = "Starred"
         case recentlyAdded = "Recently Added"
         case shortBooks = "Short Books"
         case longBooks = "Long Books"
@@ -96,6 +97,7 @@ class LibraryViewModel: ObservableObject {
 
         var icon: String {
             switch self {
+            case .starred: return "star.fill"
             case .recentlyAdded: return "clock"
             case .shortBooks: return "hourglass.bottomhalf.filled"
             case .longBooks: return "hourglass.tophalf.filled"
@@ -107,6 +109,8 @@ class LibraryViewModel: ObservableObject {
         /// Returns true if the book matches this smart collection's criteria
         func matches(_ book: Book) -> Bool {
             switch self {
+            case .starred:
+                return book.isStarred
             case .recentlyAdded:
                 guard let modDate = book.fileModDate else { return false }
                 return modDate > Calendar.current.date(byAdding: .day, value: -30, to: Date())!
@@ -397,9 +401,24 @@ class LibraryViewModel: ObservableObject {
     func scanLibrary() async {
         guard let library = activeLibrary else { return }
 
+        // Clear previous result so the UI doesn't show stale info
+        scanResult = nil
+
         // Cancel any in-progress metadata extraction from a previous scan
         metadataTask?.cancel()
         metadataTask = nil
+
+        // Fix books incorrectly marked as loaded from previous failed extractions
+        // (Google Drive timeouts could return empty metadata that got marked as "done")
+        let fixRequest: NSFetchRequest<Book> = Book.fetchRequest()
+        fixRequest.predicate = NSPredicate(format: "library == %@ AND metadataLoaded == YES AND duration == 0", library)
+        if let broken = try? persistence.container.viewContext.fetch(fixRequest), !broken.isEmpty {
+            for book in broken {
+                book.metadataLoaded = false
+            }
+            persistence.save()
+            print("Reset \(broken.count) books with failed metadata for retry")
+        }
 
         // Ensure folder access is active
         if activeFolderURL == nil {
@@ -442,8 +461,37 @@ class LibraryViewModel: ObservableObject {
             self.loadBooks()
             self.isLoadingMetadata = false
             self.metadataTask = nil
+            self.scanResult = ScanResult(
+                totalFilesFound: filesResult.totalFilesFound,
+                added: filesResult.added,
+                updated: filesResult.queued,
+                removed: filesResult.removed,
+                skipped: filesResult.skipped
+            )
             print("Metadata extraction complete for \(library.displayName)")
         }
+    }
+
+    /// Force-refreshes all metadata by resetting metadataLoaded on every book,
+    /// then running a normal scan. This re-extracts covers, titles, etc. from scratch.
+    func forceRefreshLibrary() async {
+        guard let library = activeLibrary else { return }
+
+        let context = persistence.container.viewContext
+        let request: NSFetchRequest<Book> = Book.fetchRequest()
+        request.predicate = NSPredicate(format: "library == %@", library)
+
+        do {
+            let allBooks = try context.fetch(request)
+            for book in allBooks {
+                book.metadataLoaded = false
+            }
+            try context.save()
+        } catch {
+            print("Failed to reset metadata flags: \(error)")
+        }
+
+        await scanLibrary()
     }
 
     /// Fallback: returns a plain file URL (works outside sandbox)
@@ -603,6 +651,13 @@ class LibraryViewModel: ObservableObject {
         book.isCompleted = false
         persistence.save()
         notifyChange()
+    }
+
+    /// Toggles a book's starred status
+    func toggleStarred(_ book: Book) {
+        book.isStarred.toggle()
+        persistence.save()
+        loadBooks()  // Recompute sidebar counts so Starred collection appears/disappears
     }
 
     /// Defers objectWillChange to the next run loop tick to avoid

@@ -109,6 +109,13 @@ struct BookListRow: View {
                 Label(book.isInProgress ? "Resume" : "Play", systemImage: "play.fill")
             }
 
+            Button {
+                libraryVM.toggleStarred(book)
+            } label: {
+                Label(book.isStarred ? "Remove from Starred" : "Add to Starred",
+                      systemImage: book.isStarred ? "star.slash" : "star")
+            }
+
             Divider()
 
             if !book.isCompleted {

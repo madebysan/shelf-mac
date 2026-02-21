@@ -7,41 +7,66 @@ extension Book {
 
     // MARK: - Cover Art
 
-    /// Returns an NSImage from the stored cover art data, or a placeholder
+    /// Returns an NSImage from the stored cover art data, or the appropriate placeholder
     var coverImage: NSImage {
         if let data = coverArtData, let image = NSImage(data: data) {
             return image
         }
-        return Self.placeholderCover
+        // Pending scan: metadata hasn't been extracted yet
+        // Missing cover: metadata was extracted but no artwork found
+        return metadataLoaded ? Self.missingCoverPlaceholder : Self.pendingScanPlaceholder
     }
 
-    /// Cached placeholder image — drawn once, reused for all books without cover art
-    private static let _cachedPlaceholder: NSImage = {
+    /// Draws a placeholder image with a given SF Symbol name and tint color
+    private static func makePlaceholder(symbolName: String, symbolColor: NSColor) -> NSImage {
         let size = NSSize(width: 200, height: 200)
         let image = NSImage(size: size)
         image.lockFocus()
 
-        // Background
-        NSColor.secondarySystemFill.setFill()
+        // Light grey background
+        NSColor.separatorColor.withAlphaComponent(0.15).setFill()
         NSBezierPath(roundedRect: NSRect(origin: .zero, size: size), xRadius: 8, yRadius: 8).fill()
 
-        // Book icon using SF Symbol
-        if let symbol = NSImage(systemSymbolName: "book.closed.fill", accessibilityDescription: "Book") {
+        // Symbol icon
+        if let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
             let symbolConfig = NSImage.SymbolConfiguration(pointSize: 48, weight: .light)
             let configured = symbol.withSymbolConfiguration(symbolConfig) ?? symbol
             let symbolSize = configured.size
             let x = (size.width - symbolSize.width) / 2
             let y = (size.height - symbolSize.height) / 2
-            NSColor.tertiaryLabelColor.setFill()
+            symbolColor.setFill()
             configured.draw(in: NSRect(x: x, y: y, width: symbolSize.width, height: symbolSize.height))
         }
 
         image.unlockFocus()
         return image
-    }()
+    }
 
-    /// A simple programmatic placeholder for books without cover art (1:1)
-    static var placeholderCover: NSImage { _cachedPlaceholder }
+    /// Hourglass icon — shown while metadata extraction is pending
+    private static let _pendingScanPlaceholder: NSImage = makePlaceholder(
+        symbolName: "hourglass",
+        symbolColor: NSColor.tertiaryLabelColor
+    )
+
+    /// Book icon — shown when metadata was extracted but no cover art was found
+    private static let _missingCoverPlaceholder: NSImage = makePlaceholder(
+        symbolName: "book.closed.fill",
+        symbolColor: NSColor.quaternaryLabelColor
+    )
+
+    static var pendingScanPlaceholder: NSImage { _pendingScanPlaceholder }
+    static var missingCoverPlaceholder: NSImage { _missingCoverPlaceholder }
+
+    /// Legacy accessor — returns the missing cover placeholder
+    static var placeholderCover: NSImage { _missingCoverPlaceholder }
+
+    // MARK: - Cloud Status
+
+    /// True if the file is on a cloud mount but hasn't been downloaded locally.
+    var isCloudOnly: Bool {
+        guard let path = filePath else { return false }
+        return FileUtils.isCloudOnly(path: path)
+    }
 
     // MARK: - Computed Properties
 

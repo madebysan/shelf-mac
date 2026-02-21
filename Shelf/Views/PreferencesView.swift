@@ -40,14 +40,35 @@ struct PreferencesView: View {
                     }
                 }
 
-                Button("Refresh Library Now") {
-                    Task { await libraryVM.scanLibrary() }
+                HStack {
+                    Button("Refresh Library") {
+                        Task { await libraryVM.scanLibrary() }
+                    }
+                    .disabled(libraryVM.isScanning || libraryVM.isLoadingMetadata || libraryVM.activeLibrary == nil)
+
+                    Button("Re-scan All Metadata") {
+                        Task { await libraryVM.forceRefreshLibrary() }
+                    }
+                    .disabled(libraryVM.isScanning || libraryVM.isLoadingMetadata || libraryVM.activeLibrary == nil)
                 }
-                .disabled(libraryVM.isScanning || libraryVM.activeLibrary == nil)
+
+                Text("Refresh checks for new or removed files. Re-scan re-extracts all metadata (covers, titles, etc.).")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
 
                 if libraryVM.isScanning {
                     ProgressView()
                         .controlSize(.small)
+                }
+
+                if libraryVM.isLoadingMetadata {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ProgressView(value: Double(libraryVM.metadataProgress), total: Double(max(libraryVM.metadataTotal, 1)))
+                            .controlSize(.small)
+                        Text("Extracting metadata: \(libraryVM.metadataProgress) / \(libraryVM.metadataTotal)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 if let result = libraryVM.scanResult {
@@ -94,10 +115,13 @@ struct PreferencesView: View {
                 Text("A native audiobook player for macOS.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                Text("Made by [santiagoalonso.com](https://santiagoalonso.com)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 400)
+        .frame(width: 450, height: 500)
         .sheet(isPresented: $showManageLibraries) {
             ManageLibrariesView()
                 .environmentObject(libraryVM)

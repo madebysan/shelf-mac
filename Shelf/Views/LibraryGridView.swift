@@ -10,9 +10,9 @@ struct LibraryGridView: View {
     private var gridColumns: [GridItem] {
         switch libraryVM.viewMode {
         case .grid:
-            return [GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 20)]
+            return [GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 20, alignment: .top)]
         case .bigGrid:
-            return [GridItem(.adaptive(minimum: 240, maximum: 280), spacing: 24)]
+            return [GridItem(.adaptive(minimum: 240, maximum: 280), spacing: 24, alignment: .top)]
         case .list:
             return [] // not used
         }

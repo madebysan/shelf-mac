@@ -17,8 +17,13 @@ class PlayerViewModel: ObservableObject {
     @Published var showBookmarkList: Bool = false
     @Published var showAddBookmark: Bool = false
 
+    // Cloud download state (in-memory only, not persisted)
+    @Published var downloadingBookID: NSManagedObjectID?
+    @Published var downloadProgress: Double = 0
+
     let audioService: AudioPlayerService
     private var cancellables = Set<AnyCancellable>()
+    private var downloadTask: Task<Void, Never>?
 
     init(audioService: AudioPlayerService) {
         self.audioService = audioService
@@ -37,10 +42,26 @@ class PlayerViewModel: ObservableObject {
 
     // MARK: - Playback
 
-    /// Opens a book for playback (loads chapters, starts playing)
+    /// Opens a book for playback (loads chapters, starts playing).
+    /// If the book is cloud-only, downloads it first via NSFileCoordinator.
     func openBook(_ book: Book) {
+        // If already downloading this book, ignore duplicate taps
+        if downloadingBookID == book.objectID { return }
+
         currentBook = book
 
+        // Cloud-only: download first, then play
+        if book.isCloudOnly {
+            startDownloadAndPlay(book)
+            return
+        }
+
+        // Local file: play immediately
+        playLocalBook(book)
+    }
+
+    /// Plays a local (already-downloaded) book
+    private func playLocalBook(_ book: Book) {
         // Load chapters if the book has them
         if book.hasChapters, let path = book.filePath {
             Task {
@@ -53,6 +74,89 @@ class PlayerViewModel: ObservableObject {
 
         loadBookmarks(for: book)
         audioService.play(book: book)
+    }
+
+    /// Downloads a cloud-only book, re-extracts metadata, then plays it
+    private func startDownloadAndPlay(_ book: Book) {
+        guard let path = book.filePath else { return }
+        let url = URL(fileURLWithPath: path)
+        let bookID = book.objectID
+
+        // Set download state
+        downloadingBookID = bookID
+        downloadProgress = 0
+
+        // Cancel any previous download
+        downloadTask?.cancel()
+
+        downloadTask = Task {
+            // Get the file's reported size for progress estimation
+            let fileSize: Int64 = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
+
+            // Start the actual download on a background thread (NSFileCoordinator blocks)
+            let downloadHandle = Task.detached(priority: .userInitiated) {
+                try await FileUtils.startCloudDownload(url: url)
+            }
+
+            // Poll st_blocks every second to estimate download progress
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                if Task.isCancelled { break }
+
+                var s = stat()
+                guard stat(path, &s) == 0 else { continue }
+
+                if s.st_blocks > 0 {
+                    // File has local bytes — estimate progress from blocks
+                    // Each block is 512 bytes; compare to reported file size
+                    if fileSize > 0 {
+                        let bytesOnDisk = Int64(s.st_blocks) * 512
+                        let progress = min(Double(bytesOnDisk) / Double(fileSize), 1.0)
+                        self.downloadProgress = progress
+                    }
+
+                    // Check if download is complete (blocks cover the full file)
+                    let bytesOnDisk = Int64(s.st_blocks) * 512
+                    if bytesOnDisk >= fileSize {
+                        break
+                    }
+                }
+            }
+
+            // Wait for the coordinator to finish (may already be done)
+            do {
+                try await downloadHandle.value
+            } catch {
+                // Download failed or was cancelled
+                if !Task.isCancelled {
+                    audioService.playbackError = "Download failed: \(error.localizedDescription)"
+                }
+                downloadingBookID = nil
+                downloadProgress = 0
+                return
+            }
+
+            // Download complete
+            downloadProgress = 1.0
+
+            // Re-extract metadata now that the file bytes are local
+            let metadata = await MetadataExtractor.extract(from: url)
+            let context = book.managedObjectContext ?? PersistenceController.shared.container.viewContext
+            book.title = metadata.title ?? book.title
+            book.author = metadata.author ?? book.author
+            book.genre = metadata.genre ?? book.genre
+            book.year = metadata.year > 0 ? metadata.year : book.year
+            book.duration = metadata.duration > 0 ? metadata.duration : book.duration
+            book.coverArtData = metadata.coverArtData ?? book.coverArtData
+            book.hasChapters = metadata.hasChapters
+            book.metadataLoaded = true
+            PersistenceController.shared.save()
+
+            // Clear download state and play
+            downloadingBookID = nil
+            downloadProgress = 0
+            playLocalBook(book)
+        }
     }
 
     /// Current chapter name based on playback position

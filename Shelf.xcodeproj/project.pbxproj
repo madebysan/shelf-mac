@@ -34,6 +34,7 @@
 		A10000010000000000000106 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000106 /* MiniPlayerView.swift */; };
 		A10000010000000000000107 /* ManageLibrariesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000107 /* ManageLibrariesView.swift */; };
 		A10000010000000000000108 /* Library+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000108 /* Library+Extensions.swift */; };
+		A10000010000000000000109 /* FileUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000109 /* FileUtils.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -67,6 +68,7 @@
 		A20000010000000000000106 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
 		A20000010000000000000107 /* ManageLibrariesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManageLibrariesView.swift; sourceTree = "<group>"; };
 		A20000010000000000000108 /* Library+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Library+Extensions.swift"; sourceTree = "<group>"; };
+		A20000010000000000000109 /* FileUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileUtils.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -152,6 +154,7 @@
 				A20000010000000000000008 /* AudioPlayerService.swift */,
 				A20000010000000000000104 /* ProgressExporter.swift */,
 				A20000010000000000000105 /* MiniPlayerController.swift */,
+				A20000010000000000000109 /* FileUtils.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -259,6 +262,7 @@
 				A10000010000000000000106 /* MiniPlayerView.swift in Sources */,
 				A10000010000000000000107 /* ManageLibrariesView.swift in Sources */,
 				A10000010000000000000108 /* Library+Extensions.swift in Sources */,
+				A10000010000000000000109 /* FileUtils.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
