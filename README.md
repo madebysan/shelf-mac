@@ -4,11 +4,11 @@
 
 <h1 align="center">Shelf</h1>
 
-<p align="center">A native macOS audio player for audiobooks, lectures, and long-form listening.<br>
-Browse, listen, bookmark, and pick up where you left off.</p>
+<p align="center">A native macOS player for audiobooks, lectures, and long-form listening.<br>
+Browse, listen, bookmark, and pick up where you left off — from local files or Google Drive.</p>
 
-<p align="center">macOS 14+ · Apple Silicon & Intel</p>
-<p align="center"><a href="https://github.com/madebysan/shelf/releases/latest"><strong>Download Shelf</strong></a></p>
+<p align="center"><strong>Version 1.3</strong> · macOS 14+ · Apple Silicon & Intel</p>
+<p align="center"><a href="https://github.com/madebysan/shelf-mac/releases/latest"><strong>Download Shelf</strong></a></p>
 
 <p align="center">
   <img src="shelf-screenshot.png" width="600" alt="Shelf — audiobook library view">
@@ -16,16 +16,27 @@ Browse, listen, bookmark, and pick up where you left off.</p>
 
 ## Features
 
-- **Multiple libraries** — add as many folders as you want, each with independent content and playback state. Switch between them from the sidebar dropdown or manage them all from a single sheet.
-- **Library management** — point Shelf at any folder and it scans for m4b, m4a, and mp3 files, extracting metadata and cover art automatically
+- **Multiple libraries** — add as many folders as you want, each with independent content and playback state
+- **Google Drive support** — point Shelf at a Google Drive folder and it scans for audiobooks, handling cloud-only files with smart error recovery
+- **Download-then-play** — cloud-only files auto-download when clicked, with progress display and automatic metadata re-extraction
 - **Multiple view modes** — browse your library as a grid, large grid, or sortable list
-- **Playback** — play/pause, skip forward/back 30s, adjustable speed (0.5x-2x), chapter navigation, and media key support
+- **Playback** — play/pause, skip forward/back 30s, adjustable speed (0.5x–2.0x), chapter navigation, and media key support
 - **Bookmarks** — mark important moments with a name and optional note, jump back to them anytime
+- **Sleep timer** — 15/30/45/60 min presets or end-of-chapter, with volume fade
+- **Discover mode** — plays a random book from a random position without saving progress
 - **Smart Collections** — auto-grouped sidebar views: Recently Added, Short Books, Long Books, Not Started, Nearly Finished
 - **Progress tracking** — playback position is saved automatically and persists across launches
+- **Star / hide / rate** — star favorites, hide books from the library, rate 1–5 stars
+- **Cover art lookup** — searches iTunes, Google Books, and Open Library for cover art when files lack embedded artwork
 - **Import/Export** — backup and restore your progress and bookmarks as a JSON file
 - **Mini Player** — floating always-on-top player that follows across desktop spaces
 - **Sidebar navigation** — browse by author, genre, year, smart collection, or status
+
+## Supported Formats
+
+- **m4b** — AAC audiobooks
+- **m4a** — AAC audio
+- **mp3** — MPEG audio
 
 ## Install
 
@@ -71,10 +82,10 @@ Shelf/
     AudiobookModel          # Core Data model (Book, Bookmark, Library entities)
     Book+Extensions.swift   # Display helpers, formatting
     Bookmark+Extensions.swift
-    Library+Extensions.swift # Library display helpers
+    Library+Extensions.swift
   ViewModels/
     LibraryViewModel.swift  # Library state, scanning, filtering, import/export
-    PlayerViewModel.swift   # Playback bridge, chapters, bookmarks
+    PlayerViewModel.swift   # Playback bridge, chapters, bookmarks, sleep timer
   Views/
     LibraryGridView.swift   # Grid/list library display
     BookCardView.swift      # Grid card component
@@ -90,11 +101,13 @@ Shelf/
     PreferencesView.swift   # Settings window
   Services/
     AudioPlayerService.swift    # AVPlayer wrapper, Now Playing integration
-    PersistenceController.swift # Core Data stack
+    CoverArtService.swift       # iTunes/Google Books/Open Library cover lookup
+    FileUtils.swift             # Cloud file detection, NSFileCoordinator downloads
     LibraryScanner.swift        # File discovery and metadata sync
     MetadataExtractor.swift     # AVFoundation metadata extraction
-    ProgressExporter.swift      # JSON import/export
     MiniPlayerController.swift  # Floating NSPanel management
+    PersistenceController.swift # Core Data stack
+    ProgressExporter.swift      # JSON import/export
 ```
 
 ## License
