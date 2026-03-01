@@ -14,6 +14,8 @@ Browse, listen, bookmark, and pick up where you left off — from local files or
   <img src="shelf-screenshot.png" width="600" alt="Shelf — audiobook library view">
 </p>
 
+<p align="center">Also available for <a href="https://github.com/madebysan/shelf-ios"><strong>iOS</strong></a></p>
+
 ## Features
 
 - **Multiple libraries** — add as many folders as you want, each with independent content and playback state
