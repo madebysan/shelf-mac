@@ -5,40 +5,40 @@
 <h1 align="center">Shelf</h1>
 
 <p align="center">A native macOS player for audiobooks, lectures, and long-form listening.<br>
-Browse, listen, bookmark, and pick up where you left off — from local files or Google Drive.</p>
+Browse, listen, bookmark, and pick up where you left off – from local files or Google Drive.</p>
 
 <p align="center"><strong>Version 1.3</strong> · macOS 14+ · Apple Silicon & Intel</p>
 <p align="center"><a href="https://github.com/madebysan/shelf-mac/releases/latest"><strong>Download Shelf</strong></a></p>
 
 <p align="center">
-  <img src="shelf-screenshot.png" width="600" alt="Shelf — audiobook library view">
+  <img src="shelf-screenshot.png" width="600" alt="Shelf – audiobook library view">
 </p>
 
 <p align="center">Also available for <a href="https://github.com/madebysan/shelf-ios"><strong>iOS</strong></a> and <a href="https://github.com/madebysan/shelf-android"><strong>Android</strong></a></p>
 
 ## Features
 
-- **Multiple libraries** — add as many folders as you want, each with independent content and playback state
-- **Google Drive support** — point Shelf at a Google Drive folder and it scans for audiobooks, handling cloud-only files with smart error recovery
-- **Download-then-play** — cloud-only files auto-download when clicked, with progress display and automatic metadata re-extraction
-- **Multiple view modes** — browse your library as a grid, large grid, or sortable list
-- **Playback** — play/pause, skip forward/back 30s, adjustable speed (0.5x–2.0x), chapter navigation, and media key support
-- **Bookmarks** — mark important moments with a name and optional note, jump back to them anytime
-- **Sleep timer** — 15/30/45/60 min presets or end-of-chapter, with volume fade
-- **Discover mode** — plays a random book from a random position without saving progress
-- **Smart Collections** — auto-grouped sidebar views: Recently Added, Short Books, Long Books, Not Started, Nearly Finished
-- **Progress tracking** — playback position is saved automatically and persists across launches
-- **Star / hide / rate** — star favorites, hide books from the library, rate 1–5 stars
-- **Cover art lookup** — searches iTunes, Google Books, and Open Library for cover art when files lack embedded artwork
-- **Import/Export** — backup and restore your progress and bookmarks as a JSON file
-- **Mini Player** — floating always-on-top player that follows across desktop spaces
-- **Sidebar navigation** — browse by author, genre, year, smart collection, or status
+- **Multiple libraries** – add as many folders as you want, each with independent content and playback state
+- **Google Drive support** – point Shelf at a Google Drive folder and it scans for audiobooks, handling cloud-only files with smart error recovery
+- **Download-then-play** – cloud-only files auto-download when clicked, with progress display and automatic metadata re-extraction
+- **Multiple view modes** – browse your library as a grid, large grid, or sortable list
+- **Playback** – play/pause, skip forward/back 30s, adjustable speed (0.5x–2.0x), chapter navigation, and media key support
+- **Bookmarks** – mark important moments with a name and optional note, jump back to them anytime
+- **Sleep timer** – 15/30/45/60 min presets or end-of-chapter, with volume fade
+- **Discover mode** – plays a random book from a random position without saving progress
+- **Smart Collections** – auto-grouped sidebar views: Recently Added, Short Books, Long Books, Not Started, Nearly Finished
+- **Progress tracking** – playback position is saved automatically and persists across launches
+- **Star / hide / rate** – star favorites, hide books from the library, rate 1–5 stars
+- **Cover art lookup** – searches iTunes, Google Books, and Open Library for cover art when files lack embedded artwork
+- **Import/Export** – backup and restore your progress and bookmarks as a JSON file
+- **Mini Player** – floating always-on-top player that follows across desktop spaces
+- **Sidebar navigation** – browse by author, genre, year, smart collection, or status
 
 ## Supported Formats
 
-- **m4b** — AAC audiobooks
-- **m4a** — AAC audio
-- **mp3** — MPEG audio
+- **m4b** – AAC audiobooks
+- **m4a** – AAC audio
+- **mp3** – MPEG audio
 
 ## Install
 
@@ -46,7 +46,7 @@ Download `Shelf.dmg` from the [latest release](https://github.com/madebysan/shel
 
 ## Free audio to get started
 
-[Open Culture](https://www.openculture.com/freeaudiobooks) maintains a curated list of 1,000+ free audiobooks — classics from Twain, Orwell, Austen, and more. Download the MP3s, point Shelf at the folder, and you're listening.
+[Open Culture](https://www.openculture.com/freeaudiobooks) maintains a curated list of 1,000+ free audiobooks – classics from Twain, Orwell, Austen, and more. Download the MP3s, point Shelf at the folder, and you're listening.
 
 ## Build from source
 
